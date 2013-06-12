@@ -14,7 +14,7 @@ def build
       ant_executable,
       "clean",
       "package",
-      "-debug",
+      # "-debug",
       "-Dtools.dir=\"#{tools_dir}\"",
       "-Dandroid.api.level=17",
       "-Dversion=#{Calabash::Android::VERSION}",
@@ -45,7 +45,7 @@ task :build do
 
   build
 
-  Rake::Task["install"].execute
+  # Rake::Task["install"].execute
 
 end
 
