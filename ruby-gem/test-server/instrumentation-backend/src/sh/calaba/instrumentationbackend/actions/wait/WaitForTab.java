@@ -2,14 +2,14 @@ package sh.calaba.instrumentationbackend.actions.wait;
 
 import java.util.List;
 
+import sh.calaba.instrumentationbackend.InstrumentationBackend;
+import sh.calaba.instrumentationbackend.Result;
+import sh.calaba.instrumentationbackend.actions.Action;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.widget.TabHost;
 import android.widget.TextView;
-import sh.calaba.instrumentationbackend.InstrumentationBackend;
-import sh.calaba.instrumentationbackend.Result;
-import sh.calaba.instrumentationbackend.actions.Action;
 
 /**
  * Waits for a tab by name
@@ -75,7 +75,7 @@ public class WaitForTab implements Action {
             		}
         		} else {
         			Log.i("WaitForTab", "current tab view: " + view.getId() + ", " + view.getClass().getSimpleName());
-        			List<TextView> textViews = InstrumentationBackend.solo.getCurrentTextViews(view);
+        			List<TextView> textViews = InstrumentationBackend.solo.getCurrentViews(TextView.class, view);
         			for( TextView textView : textViews ) {
         				currentTab = textView.getText().toString();
         				Log.i("WaitForTab", " child text view: " + currentTab);

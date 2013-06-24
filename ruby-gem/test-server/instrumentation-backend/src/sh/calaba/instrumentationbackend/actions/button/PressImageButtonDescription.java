@@ -1,11 +1,10 @@
 package sh.calaba.instrumentationbackend.actions.button;
 
 
-import android.widget.ImageButton;
-import android.view.ViewGroup;
 import sh.calaba.instrumentationbackend.InstrumentationBackend;
 import sh.calaba.instrumentationbackend.Result;
 import sh.calaba.instrumentationbackend.actions.Action;
+import android.widget.ImageButton;
 
 
 public class PressImageButtonDescription implements Action {
@@ -19,7 +18,7 @@ public class PressImageButtonDescription implements Action {
         }
 
         int count = 0;
-        for (ImageButton b : InstrumentationBackend.solo.getCurrentImageButtons()){
+        for (ImageButton b : InstrumentationBackend.solo.getCurrentViews(ImageButton.class)){
             err += " "+ b.getContentDescription();
             if (args[0].equals(b.getContentDescription())){
                 if (count == index) {

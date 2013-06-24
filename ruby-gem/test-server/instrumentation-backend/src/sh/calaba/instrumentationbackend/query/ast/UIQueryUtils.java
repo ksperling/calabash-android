@@ -22,14 +22,15 @@ import sh.calaba.instrumentationbackend.query.CompletedFuture;
 import sh.calaba.instrumentationbackend.query.Query;
 import sh.calaba.instrumentationbackend.query.ViewMapper;
 import sh.calaba.instrumentationbackend.query.antlr.UIQueryParser;
-import sh.calaba.org.codehaus.jackson.map.ObjectMapper;
-import sh.calaba.org.codehaus.jackson.type.TypeReference;
 import android.text.InputType;
 import android.view.View;
 import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.TextView;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class UIQueryUtils {	
 	
@@ -297,6 +298,7 @@ public class UIQueryUtils {
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static Map<?,?> mapWithElAsNull(Map<?,?> dump) {
+		if (dump == null) return null;
 		HashMap result = new HashMap(dump);
 		result.put("el",null);
 		return result;
@@ -330,9 +332,15 @@ public class UIQueryUtils {
 		List<View> currentChildren = dummyQuery.rootViews(); 
 				
 		for (Integer i:path) {
-			View child = currentChildren.get(i);		
-			currentView = serializeViewToDump(child);
-			currentChildren = UIQueryUtils.subviews(child);						
+			if (i < currentChildren.size()) {
+				View child = currentChildren.get(i);		
+				currentView = serializeViewToDump(child);
+				currentChildren = UIQueryUtils.subviews(child);	
+			}
+			else {
+				return null;				
+			}
+									
 		}
 		
 		return currentView;

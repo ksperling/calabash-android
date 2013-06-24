@@ -3,11 +3,11 @@ package sh.calaba.instrumentationbackend.actions.text;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
-import android.widget.GridView;
-import android.widget.TextView;
 import sh.calaba.instrumentationbackend.InstrumentationBackend;
 import sh.calaba.instrumentationbackend.Result;
 import sh.calaba.instrumentationbackend.actions.Action;
+import android.widget.GridView;
+import android.widget.TextView;
 
 /**
  * Optional arg is 1-based index - eg: assert_no_duplicates_in_grid, "1" examines the first grid
@@ -17,7 +17,7 @@ public class AssertGridViewContainsNoDuplicates implements Action {
 
 	@Override
 	public Result execute(String... args) {
-		ArrayList<GridView> gridViews = InstrumentationBackend.solo.getCurrentGridViews();
+		ArrayList<GridView> gridViews = InstrumentationBackend.solo.getCurrentViews(GridView.class);
 
 		if( gridViews.size() == 0 ) {
 			return new Result(false, "Could not find any grid views");
@@ -50,7 +50,7 @@ public class AssertGridViewContainsNoDuplicates implements Action {
 
 	private LinkedList<String> assertNoDuplicatesInGrid( GridView gridView ) {
 		//InstrumentationBackend.solo.getViews( gridView );
-		ArrayList<TextView> textViews = InstrumentationBackend.solo.getCurrentTextViews( gridView );
+		ArrayList<TextView> textViews = InstrumentationBackend.solo.getCurrentViews(TextView.class, gridView );
 		LinkedList<String> textValues = new LinkedList<String>();
 		LinkedList<String> duplicates = new LinkedList<String>();
 
