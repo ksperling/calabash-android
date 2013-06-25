@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -20,11 +19,11 @@ import sh.calaba.instrumentationbackend.InstrumentationBackend;
 import sh.calaba.instrumentationbackend.Result;
 import sh.calaba.instrumentationbackend.json.JSONUtils;
 import sh.calaba.instrumentationbackend.query.Query;
+import sh.calaba.org.codehaus.jackson.map.DeserializationConfig.Feature;
+import sh.calaba.org.codehaus.jackson.map.ObjectMapper;
 import android.graphics.Bitmap;
 import android.util.Log;
 import android.view.View;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class HttpServer extends NanoHTTPD {
 	private static final String TAG = "InstrumentationBackend";
@@ -34,8 +33,9 @@ public class HttpServer extends NanoHTTPD {
 	private final Lock lock = new ReentrantLock();
 	private final Condition shutdownCondition = lock.newCondition();
 
+	private final ObjectMapper mapper = createJsonMapper();
+
 	private static HttpServer instance;
-	
 
 	/**
 	 * Creates and returns the singleton instance for HttpServer.
@@ -69,8 +69,6 @@ public class HttpServer extends NanoHTTPD {
 	public Response serve(String uri, String method, Properties header,
 			Properties params, Properties files) {
 		System.out.println("URI: " + uri);
-		System.out.println("params: " + params);
-		
 		if (uri.endsWith("/ping")) {
 			return new NanoHTTPD.Response(HTTP_OK, MIME_HTML, "pong");
 
@@ -186,12 +184,6 @@ public class HttpServer extends NanoHTTPD {
 
 		System.out.println("header: " + header);
 		System.out.println("params: " + params);
-		Enumeration<String> propertyNames = (Enumeration<String>) params.propertyNames();
-		while (propertyNames.hasMoreElements())
-		{
-			String s = propertyNames.nextElement();
-			System.out.println("ProP "+s+" = "+params.getProperty(s));
-		}
 		System.out.println("files: " + files);
 
 		String commandString = params.getProperty("json");
@@ -224,10 +216,14 @@ public class HttpServer extends NanoHTTPD {
 		throw new RuntimeException("Could not find any views");
 	}
 
+	private ObjectMapper createJsonMapper() {
+		ObjectMapper mapper = new ObjectMapper();
+		mapper.configure(Feature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+		return mapper;
+	}
 
 	private String toJson(Result result) {
 		try {
-			ObjectMapper mapper = new ObjectMapper();
 			return mapper.writeValueAsString(result);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -236,7 +232,6 @@ public class HttpServer extends NanoHTTPD {
 
 	private Result runCommand(String commandString) {
 		try {
-			ObjectMapper mapper = new ObjectMapper();
 			Command command = mapper.readValue(commandString, Command.class);
 			log("Got command:'" + command);
 			return command.execute();

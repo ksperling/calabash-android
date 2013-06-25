@@ -27,12 +27,7 @@
  */
 package org.antlr.runtime;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /** The most common stream of tokens is one where every token is buffered up
  *  and tokens are prefiltered for a certain channel (the parser will only
