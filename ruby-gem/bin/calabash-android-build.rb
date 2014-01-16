@@ -1,19 +1,38 @@
 def calabash_build(app)
-  keystore = read_keystore_info()
-  if fingerprint_from_keystore != fingerprint_from_apk(app)
-    puts "#{app} is not signed with the configured keystore '#{keystore["keystore_location"]}' Aborting!"
+  apk_fingerprint = fingerprint_from_apk(app)
+  log "#{app} was signed with a certificate with fingerprint #{apk_fingerprint}"
+
+  keystores = JavaKeystore.get_keystores
+  if keystores.empty?
+    puts "No keystores found."
+    puts "Please create one or run calabash-android setup to configure calabash-android to use an existing keystore."
     exit 1
   end
+  keystore = keystores.find { |k| k.fingerprint == apk_fingerprint}
 
+  unless keystore
+    puts "#{app} is not signed with any of the available keystores."
+    puts "Tried the following keystores:"
+    keystores.each do |k|
+      puts k.location
+    end
+    puts ""
+    puts "You can resign the app with #{keystores.first.location} by running:
+    calabash-android resign #{app}"
 
+    puts ""
+    puts "Notice that resigning an app might break some functionality."
+    puts "Getting a copy of the certificate used when the app was build will in general be more reliable."
+
+    exit 1
+  end
 
   test_server_file_name = test_server_path(app)
   FileUtils.mkdir_p File.dirname(test_server_file_name) unless File.exist? File.dirname(test_server_file_name)
 
   unsigned_test_apk = File.join(File.dirname(__FILE__), '..', 'lib/calabash-android/lib/TestServer.apk')
-  platforms = Dir["#{android_home_path}/platforms/android-*"].sort_by { |item| '%08s' % item.split('-').last }
-  android_platform = platforms.last
-  raise "No Android SDK found in #{ENV["ANDROID_HOME"].gsub("\\", "/")}/platforms/" unless android_platform
+
+  android_platform = Env.android_platform_path
   Dir.mktmpdir do |workspace_dir|
     Dir.chdir(workspace_dir) do
       FileUtils.cp(unsigned_test_apk, "TestServer.apk")
@@ -27,7 +46,7 @@ def calabash_build(app)
         raise "Could not replace test package name in manifest"
       end
 
-      unless system %Q{"#{tools_dir}/aapt" package -M AndroidManifest.xml  -I "#{android_platform}/android.jar" -F dummy.apk}
+      unless system %Q{"#{Env.tools_dir}/aapt" package -M AndroidManifest.xml  -I "#{android_platform}/android.jar" -F dummy.apk}
         raise "Could not create dummy.apk"
       end
 
@@ -36,7 +55,7 @@ def calabash_build(app)
         zip_file.add("AndroidManifest.xml", "customAndroidManifest.xml")
       end
     end
-    sign_apk("#{workspace_dir}/TestServer.apk", test_server_file_name)
+    keystore.sign_apk("#{workspace_dir}/TestServer.apk", test_server_file_name)
     begin
 
     rescue Exception => e

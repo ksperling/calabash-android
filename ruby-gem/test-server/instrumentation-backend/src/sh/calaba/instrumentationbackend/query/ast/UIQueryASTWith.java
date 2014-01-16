@@ -10,6 +10,8 @@ import java.util.concurrent.Future;
 import org.antlr.runtime.tree.CommonTree;
 
 import sh.calaba.instrumentationbackend.actions.webview.QueryHelper;
+import sh.calaba.instrumentationbackend.actions.webview.UnableToFindChromeClientException;
+import android.util.Log;
 import android.view.View;
 import android.webkit.WebView;
 
@@ -40,7 +42,7 @@ public class UIQueryASTWith implements UIQueryAST {
 				for (int i = 0; i < inputViews.size(); i++) {
 					Object o = inputViews.get(i);
 
-					if (o instanceof WebView) {
+					if (o instanceof WebView && isDomQuery()) {
 						Future webResult = evaluateForWebView((WebView) o);
 						if (webResult != null) {
 							futureResult.add(webResult);
@@ -88,8 +90,13 @@ public class UIQueryASTWith implements UIQueryAST {
 
 	}
 
-	
-	@SuppressWarnings("rawtypes")
+    private boolean isDomQuery() {
+        System.out.println("isDomQuery: " + propertyName);
+        return propertyName.equalsIgnoreCase("css") || propertyName.equalsIgnoreCase("xpath");
+    }
+
+
+    @SuppressWarnings("rawtypes")
 	private Map evaluateForMap(Map map) {		
 		if (map.containsKey(this.propertyName)) {											
 			Object value = map.get(this.propertyName);
@@ -134,8 +141,14 @@ public class UIQueryASTWith implements UIQueryAST {
 		if (!(this.value instanceof String)) {
 			return null;
 		}
-		return QueryHelper.executeAsyncJavascriptInWebviews(o,
-				"calabash.js", (String) this.value,this.propertyName);
+		try {
+			return QueryHelper.executeAsyncJavascriptInWebviews(o,
+					"calabash.js", (String) this.value,this.propertyName);
+				
+		} catch (UnableToFindChromeClientException e) {
+			Log.w("Calabash","Unable to find UnableToFindChromeClientException");
+			return null;
+		}
 				
 	}
 

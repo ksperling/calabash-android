@@ -10,6 +10,7 @@ require 'calabash-android/helpers'
 require 'calabash-android/wait_helpers'
 require 'calabash-android/touch_helpers'
 require 'calabash-android/version'
+require 'calabash-android/env'
 require 'retriable'
 require 'cucumber'
 
@@ -115,6 +116,18 @@ module Operations
 
   def set_gps_coordinates(latitude, longitude)
     default_device.set_gps_coordinates(latitude, longitude)
+  end
+
+  def get_preferences(name)
+    default_device.get_preferences(name)
+  end
+
+  def set_preferences(name, hash)
+    default_device.set_preferences(name, hash)
+  end
+
+  def clear_preferences(name)
+    default_device.clear_preferences(name)
   end
 
   def query(uiquery, *args)
@@ -224,7 +237,7 @@ module Operations
       unless succeeded
         ::Cucumber.wants_to_quit = true
         raise "#{pn} did not get updated. Aborting!"
-      end    
+      end
     end
 
     def uninstall_app(package_name)
@@ -262,7 +275,7 @@ module Operations
         raise "Empty result from TestServer" if result.chomp.empty?
         result = JSON.parse(result)
         if not result["success"] then
-          raise "Step unsuccessful: #{result["message"]}"
+          raise "Action '#{action}' unsuccessful: #{result["message"]}"
         end
         result
       end
@@ -389,15 +402,7 @@ module Operations
     end
 
     def adb_command
-      "#{adb} -s #{serial}"
-    end
-
-    def adb
-      if is_windows?
-        %Q("#{ENV["ANDROID_HOME"]}\\platform-tools\\adb.exe")
-      else
-        %Q("#{ENV["ANDROID_HOME"]}/platform-tools/adb")
-      end
+      "#{Env.adb_path} -s #{serial}"
     end
 
     def default_serial
@@ -410,7 +415,7 @@ module Operations
 
     def default_server_port
       require 'yaml'
-      File.open(File.expand_path('~/.calabash.yaml'), File::RDWR|File::CREAT) do |f|
+      File.open(File.expand_path(server_port_configuration), File::RDWR|File::CREAT) do |f|
         f.flock(File::LOCK_EX)
         state = YAML::load(f) || {}
         ports = state['server_ports'] ||= {}
@@ -429,11 +434,15 @@ module Operations
       end
     end
 
+    def server_port_configuration
+      File.expand_path(ENV['CALABASH_SERVER_PORTS'] || "~/.calabash.yaml")
+    end
+
     def connected_devices
-      lines = `#{adb} devices`.split("\n")
+      lines = `#{Env.adb_path} devices`.split("\n")
       lines.shift
       lines.collect { |l| l.split("\t").first}
-    end  
+    end
 
     def wake_up
       wake_up_cmd = "#{adb_command} shell am start -a android.intent.action.MAIN -n #{package_name(@test_server_path)}/sh.calaba.instrumentationbackend.WakeUp"
@@ -568,24 +577,153 @@ module Operations
     def set_gps_coordinates(latitude, longitude)
       perform_action('set_gps_coordinates', latitude, longitude)
     end
+
+    def get_preferences(name)
+
+      log "Get preferences: #{name}, app running? #{app_running?}"
+      preferences = {}
+
+      if app_running?
+        json = perform_action('get_preferences', name);
+      else
+
+        logcat_id = get_logcat_id()
+        cmd = "#{adb_command} shell am instrument -e logcat #{logcat_id} -e name \"#{name}\" #{package_name(@test_server_path)}/sh.calaba.instrumentationbackend.GetPreferences"
+
+        raise "Could not get preferences" unless system(cmd)
+
+        logcat_cmd = get_logcat_cmd(logcat_id)
+        logcat_output = `#{logcat_cmd}`
+
+        json = get_json_from_logcat(logcat_output)
+
+        raise "Could not get preferences" unless json != nil and json["success"]
+      end
+
+      # at this point we have valid json, coming from an action
+      # or instrumentation, but we don't care, just parse
+      if json["bonusInformation"].length > 0
+          json["bonusInformation"].each do |item|
+          json_item = JSON.parse(item)
+          preferences[json_item["key"]] = json_item["value"]
+        end
+      end
+
+      preferences
+    end
+
+    def set_preferences(name, hash)
+
+      log "Set preferences: #{name}, #{hash}, app running? #{app_running?}"
+
+      if app_running?
+        perform_action('set_preferences', name, hash);
+      else
+
+        params = hash.map {|k,v| "-e \"#{k}\" \"#{v}\""}.join(" ")
+
+        logcat_id = get_logcat_id()
+        cmd = "#{adb_command} shell am instrument -e logcat #{logcat_id} -e name \"#{name}\" #{params} #{package_name(@test_server_path)}/sh.calaba.instrumentationbackend.SetPreferences"
+
+        raise "Could not set preferences" unless system(cmd)
+
+        logcat_cmd = get_logcat_cmd(logcat_id)
+        logcat_output = `#{logcat_cmd}`
+
+        json = get_json_from_logcat(logcat_output)
+
+        raise "Could not set preferences" unless json != nil and json["success"]
+      end
+    end
+
+    def clear_preferences(name)
+
+      log "Clear preferences: #{name}, app running? #{app_running?}"
+
+      if app_running?
+        perform_action('clear_preferences', name);
+      else
+
+        logcat_id = get_logcat_id()
+        cmd = "#{adb_command} shell am instrument -e logcat #{logcat_id} -e name \"#{name}\" #{package_name(@test_server_path)}/sh.calaba.instrumentationbackend.ClearPreferences"
+        raise "Could not clear preferences" unless system(cmd)
+
+        logcat_cmd = get_logcat_cmd(logcat_id)
+        logcat_output = `#{logcat_cmd}`
+
+        json = get_json_from_logcat(logcat_output)
+
+        raise "Could not clear preferences" unless json != nil and json["success"]
+      end
+    end
+
+    def get_json_from_logcat(logcat_output)
+
+      logcat_output.split(/\r?\n/).each do |line|
+        begin
+          json = JSON.parse(line)
+          return json
+        rescue
+          # nothing to do here, just discarding logcat rubbish
+        end
+      end
+
+      return nil
+    end
+
+    def get_logcat_id()
+      # we need a unique logcat tag so we can later
+      # query the logcat output and filter out everything
+      # but what we are interested in
+
+      random = (0..10000).to_a.sample
+      "#{Time.now.strftime("%s")}_#{random}"
+    end
+
+    def get_logcat_cmd(tag)
+      # returns raw logcat output for our tag
+      # filtering out everthing else
+
+      "#{adb_command} logcat -d -v raw #{tag}:* *:S"
+    end
   end
-
-
 
   def label(uiquery)
     ni
   end
 
-  def screenshot_and_raise(msg)
-    screenshot_embed
+  def screenshot_and_raise(msg, options = nil)
+    if options
+      screenshot_embed options
+    else
+      screenshot_embed
+    end
     raise(msg)
   end
 
-  def touch(uiquery,*args)
-    raise "Cannot touch nil" unless uiquery
+  def double_tap(uiquery, options = {})
+    center_x, center_y = find_coordinate(uiquery)
+
+    performAction("double_tap_coordinate", center_x, center_y)
+  end
+
+  def long_press(uiquery, options = {})
+    center_x, center_y = find_coordinate(uiquery)
+
+    performAction("long_press_coordinate", center_x, center_y)
+  end
+
+  def touch(uiquery, options = {})
+    center_x, center_y = find_coordinate(uiquery)
+
+    performAction("touch_coordinate", center_x, center_y)
+  end
+
+  def find_coordinate(uiquery)
+    raise "Cannot find nil" unless uiquery
 
     if uiquery.instance_of? String
-      elements = query(uiquery, *args)
+      elements = query(uiquery)
       raise "No elements found. Query: #{uiquery}" if elements.empty?
       element = elements.first
     else
@@ -593,10 +731,10 @@ module Operations
       element = element.first if element.instance_of?(Array)
     end
 
-
     center_x = element["rect"]["center_x"]
     center_y = element["rect"]["center_y"]
-    performAction("touch_coordinate", center_x, center_y)
+
+    [center_x, center_y]
   end
 
   def http(path, data = {}, options = {})
@@ -608,14 +746,13 @@ module Operations
   end
 
   def set_text(uiquery, txt)
-    raise "Currently queries are only supported for webviews" unless uiquery.start_with? "webView"
+    view,arguments = uiquery.split(" ",2)
+    raise "Currently queries are only supported for webviews" unless view.downcase == "webview"
 
-    uiquery.slice!(0, "webView".length)
-    if uiquery =~ /(css|xpath):\s*(.*)/
+    if arguments =~ /(css|xpath):\s*(.*)/
       r = performAction("set_text", $1, $2, txt)
-      JSON.parse(r["message"])
     else
-     raise "Invalid query #{uiquery}"
+     raise "Invalid query #{arguments}"
     end
   end
 

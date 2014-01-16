@@ -19,9 +19,6 @@ Will reinstall both the test server and the AUT to be sure the newest versions a
 ### `query(uiquery, *args)`
 Query returns an [array](http://www.ruby-doc.org/core-1.9.3/Array.html) of its results. The query function gives powerful query capability from your test code. You can find views and other application objects, and make assertions about them or extract data from them.
 
-The syntax for queries is really important, and described in a separate document: TODO: Query Syntax.
-(Until the documention for query gets written the best reference is [this blog post](http://blog.lesspainful.com/2012/12/18/Android-Query/))
-
 Calabash Android tries to return results that carry useable information by default. For view objects this includes coordinates, class and contentdescription:
 
     irb(main):002:0> query("button index:1")
@@ -213,3 +210,28 @@ Will work:
 ```
 push("file.jpg", "/sdcard/folder/file.jpg")
 ```
+
+# Read, write and clear SharedPreferences
+Simple API over [SharedPreferences](http://developer.android.com/guide/topics/data/data-storage.html#pref), all
+methods require the name of the SharedPreferences file as the first argument. Supports ints, floats, booleans and strings.
+
+It is important to notice that depending on your application you might need to poke around with SharedPreferences
+before or after your application or activity starts. In that case you will need to call these methods either
+before or after your scenario.
+
+To do so, you can tag a particular scenario and edit your application lifecycle hooks as explained [here](https://groups.google.com/forum/?fromgroups=#!topic/calabash-android/Ql3iluRMijg).
+
+### `get_preferences(name)`
+Returns a hash with the preferences available for the given name:
+
+    preferences = get_preferences("my_preferences")
+
+### `set_preferences(name, hash)`
+Sets the given hash as preferences for the given name:
+
+    set_preferences("my_preferences", {:name => "wadus", :email => "wadus@wadus.com", :id => 8, :active => true})
+
+### `clear_preferences(name)`
+Clears the preferences for the given name:
+
+    clear_preferences("my_preferences")
