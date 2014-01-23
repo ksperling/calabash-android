@@ -13,7 +13,6 @@ def build
       Env.ant_path,
       "clean",
       "package",
-      "-debug",
       "-Dtools.dir=\"#{Env.tools_dir}\"",
       "-Dandroid.api.level=19",
       "-Dversion=#{Calabash::Android::VERSION}",
