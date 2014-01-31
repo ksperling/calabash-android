@@ -380,7 +380,9 @@ module Operations
       end
 
       @@screenshot_count ||= 0
-      path = "#{prefix}#{name}_#{@@screenshot_count}.png"
+      @screen_dpi ||= `#{adb_command} shell getprop ro.sf.lcd_density`.to_i
+      suffix = @screen_dpi > 0 ? ".dpi-#{@screen_dpi}" : ""
+      path = "#{prefix}#{name}_#{@@screenshot_count}#{suffix}.png"
 
       if ENV["SCREENSHOT_VIA_USB"] == "false"
         begin
